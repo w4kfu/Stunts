@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 struct bitmap
 {
@@ -77,8 +78,8 @@ void unpack(char *buf_stunt)
 				len = *bits.pbuf++;
 				if (len == 0)
 				{
-					printf("END ?!\n");
-					//break;
+					printf("END \n");
+					/* break; */
 					continue;
 				}
 				if (len == 1)
@@ -115,7 +116,7 @@ int main(void)
 		perror("fstat()");
 		exit(EXIT_FAILURE);
 	}
-	printf("SizeFile = %X\n", st.st_size);
+	printf("SizeFile = %08X\n", st.st_size);
 	if ((buf_stunt = malloc(sizeof (char) * st.st_size)) == NULL)
 	{
 		perror("malloc()");
@@ -126,7 +127,7 @@ int main(void)
 		perror("read()");
 		goto clean;
 	}
-	// Remove COM header
+	/* Remove COM header */
 	unpack(buf_stunt + 0x20);
 clean:
 	free(buf_stunt);
