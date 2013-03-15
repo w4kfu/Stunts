@@ -4,5 +4,5 @@ For unpacking "LOAD.EXE", check my repository [UnEXEPACK][2].
 
 
 
-1:http://www.abandonware-france.org/
-2:https://github.com/w4kfu/unEXEPACK
+[1]:http://www.abandonware-france.org/
+[2]:https://github.com/w4kfu/unEXEPACK
