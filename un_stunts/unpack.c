@@ -116,7 +116,7 @@ int main(void)
 		perror("fstat()");
 		exit(EXIT_FAILURE);
 	}
-	printf("SizeFile = %08X\n", st.st_size);
+	printf("SizeFile = %lX\n", st.st_size);
 	if ((buf_stunt = malloc(sizeof (char) * st.st_size)) == NULL)
 	{
 		perror("malloc()");
@@ -149,8 +149,7 @@ void hex_dump(void *data, int size)
     {
         if (n % 16 == 1)
         {
-                snprintf(addrstr, sizeof(addrstr), "%.4x",
-                    ((unsigned int)p-(unsigned int)data));
+                snprintf(addrstr, sizeof(addrstr), "%.4x", p - (unsigned char*)data);
         }
         c = *p;
         if (isalnum(c) == 0)

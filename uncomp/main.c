@@ -43,6 +43,33 @@ unsigned int craftescape(char *buf, size_t escapelen, unsigned short **escape1, 
 	return alphabet_length - 0x46;
 }
 
+void craft_symbols_widths(char *buf, size_t escapelen, unsigned char *alphabet, unsigned char *symbols, unsigned char *widths)
+{
+	unsigned char symbolwidth;
+	unsigned char symbolcount = 0x80;
+	size_t i, j, k, escape;
+
+	if (escapelen >= 8)
+		escapelen = 8;
+
+	escape = 1;
+	for (i = 0, j = 0; escape <= escapelen; escape++, symbolcount >>= 1)
+	{
+		symbolwidth = *buf++;
+		for ( ; symbolwidth > 0; symbolwidth--, j++)
+		{
+			for (k = symbolcount; k; k--, i++)
+			{
+				symbols[i] = alphabet[j];
+				widths[i] = escape;
+			}
+		}
+	}
+	for (; i < 0x100; i++)
+		widths[i] = 0x40;
+
+}
+
 void uncomp(char *buf, size_t size)
 {
 	unsigned int uncomp_size = 0;
@@ -51,6 +78,10 @@ void uncomp(char *buf, size_t size)
 	unsigned int alphabet_length;
 	unsigned short *escape1 = NULL;
 	unsigned short *escape2 = NULL;
+	unsigned char widths[0x100] = {0};
+	unsigned char symbols[0x100] = {0};
+	unsigned char *alphabet = NULL;
+	char *buf_escape = NULL;
 
 	printf("RealSize   = 0x%08X\n", size);
 	type = *buf++;
@@ -59,13 +90,29 @@ void uncomp(char *buf, size_t size)
 	buf += 3;
 	printf("uncomp_size = %02X\n", uncomp_size);
 	escapelen = *buf++;
+	buf_escape = buf;
 	printf("EscapeLen = %02X\n", escapelen);
 	alphabet_length = craftescape(buf, escapelen, &escape1, &escape2);
 	buf += escapelen;
 	printf("AlphabetLength = %X\n", alphabet_length);
+	printf("escape1 :\n");
 	hex_dump(escape1, escapelen * 2);
+	printf("escape2 :\n");
 	hex_dump(escape2, escapelen * 2);
-
+	if (!(alphabet = malloc(sizeof (char) * alphabet_length)))
+	{
+		perror("malloc()");
+		exit(EXIT_FAILURE);
+	}
+	memcpy(alphabet, buf, alphabet_length);
+	buf += alphabet_length;
+	printf("alphabet :\n");
+	hex_dump(alphabet, alphabet_length);
+	craft_symbols_widths(buf_escape, escapelen, alphabet, symbols, widths);
+	printf("symbols :\n");
+	hex_dump(symbols, 0x100);
+	printf("widths :\n");
+	hex_dump(widths, 0x100);
 }
 
 int main(int argc, char **argv)
