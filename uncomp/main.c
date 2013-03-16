@@ -11,7 +11,7 @@
 
 void hex_dump(void *data, int size);
 
-unsigned int craftescape(char *buf, size_t escapelen, unsigned short **escape1, unsigned short **escape2)
+unsigned int craftescape(unsigned char *buf, size_t escapelen, unsigned short **escape1, unsigned short **escape2)
 {
 	unsigned char val;
 	size_t i;
@@ -45,7 +45,7 @@ unsigned int craftescape(char *buf, size_t escapelen, unsigned short **escape1, 
 	return alphabet_length - 0x46;
 }
 
-void craft_symbols_widths(char *buf, size_t escapelen, unsigned char *alphabet, unsigned char *symbols, unsigned char *widths)
+void craft_symbols_widths(unsigned char *buf, size_t escapelen, unsigned char *alphabet, unsigned char *symbols, unsigned char *widths)
 {
 	unsigned char symbolwidth;
 	unsigned char symbolcount = 0x80;
@@ -86,7 +86,7 @@ void dump_to_file(char *filename, unsigned char *buf, size_t size)
 	close(fd);
 }
 
-int decomp(char *buf, unsigned char *alphabet, unsigned char *widths, unsigned char *symbols, unsigned short *escape1, unsigned short *escape2, size_t uncomp_size)
+int decomp(unsigned char *buf, unsigned char *alphabet, unsigned char *widths, unsigned char *symbols, unsigned short *escape1, unsigned short *escape2, unsigned int uncomp_size, unsigned char *real_end_buf)
 {
 	unsigned char *dst_buf = NULL;
 	unsigned char *dst_end = NULL;
@@ -100,10 +100,12 @@ int decomp(char *buf, unsigned char *alphabet, unsigned char *widths, unsigned c
 	if (!(dst_buf = malloc(sizeof (char) * uncomp_size)))
 	{
 		perror("malloc()");
+		fprintf(stderr, "Uncomp size = %X\n", uncomp_size);
 		exit(EXIT_FAILURE);
 	}
 	sdst_buf = dst_buf;
 
+	printf("UNCOMP = %X\n", uncomp_size);
 	dst_end = dst_buf + uncomp_size;
 
 	curWord = *(unsigned short*)buf;
@@ -148,7 +150,7 @@ int decomp(char *buf, unsigned char *alphabet, unsigned char *widths, unsigned c
                                 }
                         }
 			nextWidth = 1;
-			curWord = (curWord & 0xFF) | code << 8;
+			//curWord = (curWord & 0xFF) | code << 8;
                 }
                 else 
 		{
@@ -171,7 +173,7 @@ int decomp(char *buf, unsigned char *alphabet, unsigned char *widths, unsigned c
 	return 0;
 }
 
-void uncomp(char *buf, size_t size)
+void uncomp(unsigned char *buf, size_t size)
 {
 	unsigned int uncomp_size = 0;
 	unsigned char type;
@@ -182,12 +184,14 @@ void uncomp(char *buf, size_t size)
 	unsigned char widths[0x100] = {0};
 	unsigned char symbols[0x100] = {0};
 	unsigned char *alphabet = NULL;
-	char *buf_escape = NULL;
+	unsigned char *buf_escape = NULL;
+	unsigned char	*buf_end = NULL;
 
+	buf_end = buf + size;
 	printf("RealSize   = 0x%08X\n", size);
 	type = *buf++;
 	printf("Type = %02X\n", type);
-	uncomp_size = (*buf) | ((*buf + 1) << 0x8) | ((*buf + 2) << 0x10);
+	uncomp_size = (*buf) | (*(buf + 1) << 0x8) | (*(buf + 2) << 0x10);
 	buf += 3;
 	printf("uncomp_size = %02X\n", uncomp_size);
 	escapelen = *buf++;
@@ -215,7 +219,7 @@ void uncomp(char *buf, size_t size)
 	printf("widths :\n");
 	hex_dump(widths, 0x100);
 
-	decomp(buf, alphabet, widths, symbols, escape1, escape2, uncomp_size);
+	decomp(buf, alphabet, widths, symbols, escape1, escape2, uncomp_size, buf_end);
 
 }
 
@@ -223,7 +227,7 @@ int main(int argc, char **argv)
 {
         int fd;
         struct stat st;
-        char *buf = NULL;
+        unsigned char *buf = NULL;
 
 	if (argc != 2)
 	{
