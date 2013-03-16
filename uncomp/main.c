@@ -7,6 +7,8 @@
 #include <string.h>
 #include <ctype.h>
 
+#define ROL16(x, y) ((((x)<<(y)) | ((x)>>(16-(y)))) & 0xFFFF)
+
 void hex_dump(void *data, int size);
 
 unsigned int craftescape(char *buf, size_t escapelen, unsigned short **escape1, unsigned short **escape2)
@@ -70,6 +72,105 @@ void craft_symbols_widths(char *buf, size_t escapelen, unsigned char *alphabet, 
 
 }
 
+void dump_to_file(char *filename, unsigned char *buf, size_t size)
+{
+	int fd;
+
+        fd = open(filename, O_WRONLY | O_CREAT, 0644);
+        if (fd == -1)
+        {
+                perror("open()");
+                exit(0);
+        }
+	write(fd, buf, size);
+	close(fd);
+}
+
+int decomp(char *buf, unsigned char *alphabet, unsigned char *widths, unsigned char *symbols, unsigned short *escape1, unsigned short *escape2, size_t uncomp_size)
+{
+	unsigned char *dst_buf = NULL;
+	unsigned char *dst_end = NULL;
+	unsigned char *sdst_buf = NULL;
+
+       	unsigned char curWidth = 8, nextWidth = 0, code, ind;
+        unsigned short curWord = 0;
+	size_t count = 0x0; // dbg
+
+
+	if (!(dst_buf = malloc(sizeof (char) * uncomp_size)))
+	{
+		perror("malloc()");
+		exit(EXIT_FAILURE);
+	}
+	sdst_buf = dst_buf;
+
+	dst_end = dst_buf + uncomp_size;
+
+	curWord = *(unsigned short*)buf;
+	buf += 2;
+	while (dst_buf < dst_end)
+	{
+		count++;
+		if (count > uncomp_size)
+			break;
+                code = curWord & 0xFF;
+                nextWidth = widths[code];
+                if (nextWidth > 8)
+		{
+                        ind = 0x7;
+			code = curWord >> 8;	
+			curWord = curWord & 0xFF;
+                        while (1) 
+			{
+                                if (!curWidth) 
+				{
+                                        code = *buf++;
+                                        curWidth = 8;
+                                }
+
+                                curWord = (curWord << 1) + ((code & 0x80) == 0x80); 
+				code <<= 1;
+                                curWidth--;
+                                ind += 1;
+
+                                if (curWord < escape2[ind]) 
+				{
+                                        curWord += escape1[ind];
+                                        *dst_buf++ = alphabet[curWord - 0x46];
+					curWord = (curWord & 0xFF) | code << 8;
+					nextWidth = curWidth;
+					curWord = ROL16(curWord, nextWidth);
+					curWidth = 8;
+					curWidth -= nextWidth;
+					code = *buf++;
+					curWidth = 8;
+					break;
+                                }
+                        }
+			nextWidth = 1;
+			curWord = (curWord & 0xFF) | code << 8;
+                }
+                else 
+		{
+                        *dst_buf++ = symbols[code];
+
+                        if (curWidth < nextWidth) 
+			{
+				curWord = ROL16(curWord, curWidth);
+                                nextWidth -= curWidth;
+
+				curWidth = 8;
+				curWord = (curWord & 0xFF) | *buf++ << 8;
+                        }
+                }
+		curWord = ROL16(curWord, nextWidth);
+		curWidth -= nextWidth;
+	}
+	hex_dump(sdst_buf, uncomp_size);
+	dump_to_file("rez_uncomp", sdst_buf, uncomp_size);
+	return 0;
+}
+
 void uncomp(char *buf, size_t size)
 {
 	unsigned int uncomp_size = 0;
@@ -113,6 +214,9 @@ void uncomp(char *buf, size_t size)
 	hex_dump(symbols, 0x100);
 	printf("widths :\n");
 	hex_dump(widths, 0x100);
+
+	decomp(buf, alphabet, widths, symbols, escape1, escape2, uncomp_size);
+
 }
 
 int main(int argc, char **argv)
