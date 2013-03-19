@@ -11,8 +11,6 @@
 #include "tree.h"
 #include "pqueue.h"
 
-#define HTREE_MAXLEVEL          24
-
 struct symbolsin
 {
 	unsigned int nb;

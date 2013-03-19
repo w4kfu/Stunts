@@ -108,7 +108,7 @@ int main(void)
 	fd = open("STUNTS.COM", O_RDONLY);
 	if (fd == -1)
 	{
-		perror("open()");
+		perror("open(\"STUNTS.COM\")");
 		exit(EXIT_FAILURE);
 	}
 	if (fstat(fd, &st) == -1)

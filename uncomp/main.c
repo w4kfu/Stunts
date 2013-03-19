@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <getopt.h>
 
 #include "tree.h"
 #define HTREE_MAXLEVEL          24
@@ -23,7 +24,72 @@ struct bitmap
         unsigned char count;
 };
 
+struct conf_c
+{
+	char *in;
+	char *out;
+	char *dot;
+};
+
 void hex_dump(void *data, int size);
+
+void help(char *name)
+{
+	fprintf(stderr, "Usage : %s -i <input_file> -o <output_file> [-d <output_dot_file>]\n", name);
+	exit(EXIT_FAILURE);
+}
+
+void parse_opt(int argc, char **argv, struct conf_c *conf)
+{
+   	int c;
+
+   	while (1)
+     	{
+       		static struct option long_options[] =
+         	{
+           		{"in", required_argument, 0, 'i'},
+           		{"out", required_argument, 0, 'o'},
+           		{"dot", required_argument, 0, 'd'},
+           		{0, 0, 0, 0}
+         	};
+       		int option_index = 0;
+       		c = getopt_long (argc, argv, "i:o:d:", long_options, &option_index);
+       		if (c == -1)
+         		break;
+       		switch (c)
+         	{
+         		case 'i':
+				conf->in = optarg;
+           			break;
+         		case 'o':
+				conf->out = optarg;
+           			break;
+         		case 'd':
+				conf->dot = optarg;
+           			break;
+         		case '?':
+           			break;
+         		default:
+           			help(argv[0]);
+         	}
+     	}
+}
+
+void check_opt(struct conf_c *conf, char *name)
+{
+	if (!conf->in && !conf->out)
+		help(name);
+	if (conf->in == NULL)
+	{
+		fprintf(stderr, "You must specify a file input with option -i\n");
+		exit(EXIT_FAILURE);
+	}
+	else if (conf->out == NULL)
+	{
+		fprintf(stderr, "You must specify a file output with option -o\n");
+		exit(EXIT_FAILURE);
+	}
+}
 
 void dump_to_file(char *filename, unsigned char *buf, size_t size)
 {
@@ -102,7 +168,8 @@ int getbit(struct bitmap *p)
     return b;
 }
 
-void uncomp(unsigned char *buf, struct s_tree *tree, unsigned char *end_buf, unsigned int uncomp_size)
+void uncomp(unsigned char *buf, struct s_tree *tree, unsigned char *end_buf, unsigned int uncomp_size,
+		struct conf_c *conf)
 {
 	struct bitmap bits;
 	struct s_tree *dtree = NULL;
@@ -149,7 +216,7 @@ void uncomp(unsigned char *buf, struct s_tree *tree, unsigned char *end_buf, uns
 		fprintf(stderr, "Data left !\n");
 	}
 	hex_dump(buf_res, count);
-	dump_to_file("out_uncomp", buf_res, count);
+	dump_to_file(conf->out, buf_res, count);
 }
 
 struct s_tree *tree_uniform_build(size_t depth, size_t depthmax, struct symbolsin *symbolsyn)
@@ -197,12 +264,11 @@ struct s_tree *huff_tree(unsigned int treelevel, struct symbolsin *symbolsin)
 	tree = tree_uniform_build(0, treelevel, symbolsin);
 	printf("height = %d\n", height(tree));
 	printf("size = %d\n", size(tree));
-	dotty(tree, "test.dot");
 	return tree;
 }
 
 
-void huff(unsigned char *buf, size_t size)
+void huff(unsigned char *buf, size_t size, struct conf_c *conf)
 {
 	unsigned int uncomp_size = 0;
 	unsigned int treelevels = 0;
@@ -214,7 +280,11 @@ void huff(unsigned char *buf, size_t size)
 
 	buf_end = buf + size;
 	printf("CompressedSize = %X\n", size);
-	buf++;
+	if (*buf++ != 0x02)
+	{
+		fprintf(stderr, "Wrong type of file\n");
+		return;
+	}
 	uncomp_size = (*buf) | (*(buf + 1) << 0x8) | (*(buf + 2) << 0x10);
 	buf += 3;
 	printf("Uncomp_size = %X\n", uncomp_size);
@@ -243,7 +313,9 @@ void huff(unsigned char *buf, size_t size)
 		}	
         }
 	tree = huff_tree(treelevels, symbolsin);
-	uncomp(alph, tree, buf_end, uncomp_size);
+	if (conf->dot)
+		dotty(tree, conf->dot);
+	uncomp(alph, tree, buf_end, uncomp_size, conf);
 }
 
 int main(int argc, char **argv)
@@ -251,14 +323,11 @@ int main(int argc, char **argv)
         int fd;
         struct stat st;
         unsigned char *buf = NULL;
+	struct conf_c conf = {0};
 
-	if (argc != 2)
-	{
-		fprintf(stderr, "%s <file>\n", argv[0]);
-		exit(EXIT_FAILURE);
-	}
-
-        fd = open(argv[1], O_RDONLY);
+	parse_opt(argc, argv, &conf);
+	check_opt(&conf, argv[0]);
+        fd = open(conf.in, O_RDONLY);
         if (fd == -1)
         {
                 perror("open()");
@@ -279,7 +348,7 @@ int main(int argc, char **argv)
                 perror("read()");
                 goto clean;
         }
-	huff(buf, st.st_size);
+	huff(buf, st.st_size, &conf);
 clean:
         free(buf);
         close(fd);
