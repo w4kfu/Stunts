@@ -12,8 +12,6 @@ struct s_tree *make_tree(int k, struct s_tree *lson, struct s_tree *rson)
 	return t;
 }
  
-#define MAX(a,b) ((a)<(b)?(b):(a))
- 
 size_t height(struct s_tree *t)
 {
 	size_t h = -1;
