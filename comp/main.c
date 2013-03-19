@@ -26,6 +26,12 @@ struct conf_c
 	char *dot;
 };
 
+void help(char *name)
+{
+	fprintf(stderr, "Usage : %s -i <input_file> -o <output_file> [-d <output_dot_file>]\n", name);
+	exit(EXIT_FAILURE);
+}
+
 void parse_opt(int argc, char **argv, struct conf_c *conf)
 {
    	int c;
@@ -57,13 +63,15 @@ void parse_opt(int argc, char **argv, struct conf_c *conf)
          		case '?':
            			break;
          		default:
-           			abort();
+           			help(argv[0]);
          	}
      	}
 }
 
-void check_opt(struct conf_c *conf)
+void check_opt(struct conf_c *conf, char *name)
 {
+	if (!conf->in && !conf->out)
+		help(name);
 	if (conf->in == NULL)
 	{
 		fprintf(stderr, "You must specify a file input with option -i\n");
@@ -353,7 +361,7 @@ int main(int argc, char **argv)
 	struct conf_c conf = {0};
 
 	parse_opt(argc, argv, &conf);
-	check_opt(&conf);
+	check_opt(&conf, argv[0]);
         fd = open(conf.in, O_RDONLY);
         if (fd == -1)
         {
