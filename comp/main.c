@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <getopt.h>
 
 #include "tree.h"
 #include "pqueue.h"
@@ -17,6 +18,63 @@ struct symbolsin
 	unsigned int nb;
 	unsigned char *symbol;
 };
+
+struct conf_c
+{
+	char *in;
+	char *out;
+	char *dot;
+};
+
+void parse_opt(int argc, char **argv, struct conf_c *conf)
+{
+   	int c;
+
+   	while (1)
+     	{
+       		static struct option long_options[] =
+         	{
+           		{"in", required_argument, 0, 'i'},
+           		{"out", required_argument, 0, 'o'},
+           		{"dot", required_argument, 0, 'd'},
+           		{0, 0, 0, 0}
+         	};
+       		int option_index = 0;
+       		c = getopt_long (argc, argv, "i:o:d:", long_options, &option_index);
+       		if (c == -1)
+         		break;
+       		switch (c)
+         	{
+         		case 'i':
+				conf->in = optarg;
+           			break;
+         		case 'o':
+				conf->out = optarg;
+           			break;
+         		case 'd':
+				conf->dot = optarg;
+           			break;
+         		case '?':
+           			break;
+         		default:
+           			abort();
+         	}
+     	}
+}
+
+void check_opt(struct conf_c *conf)
+{
+	if (conf->in == NULL)
+	{
+		fprintf(stderr, "You must specify a file input with option -i\n");
+		exit(EXIT_FAILURE);
+	}
+	else if (conf->out == NULL)
+	{
+		fprintf(stderr, "You must specify a file output with option -o\n");
+		exit(EXIT_FAILURE);
+	}
+}
 
 void printdotty(FILE *fp, struct s_tree *tree, int p, struct s_tree *tree_l)
 {
@@ -199,15 +257,16 @@ void bitout(FILE *f, char b)
 	}
 }
 
-void encode(unsigned char *buf, size_t size_buf, int treelevels, struct symbolsin *symbolsin, unsigned char **codes)
+void encode(unsigned char *buf, size_t size_buf, int treelevels, struct symbolsin *symbolsin, unsigned char **codes, struct conf_c *conf)
 {
 	FILE *fout;
 	unsigned char ch;
-	char *s;
+	unsigned char *s;
 	unsigned char *buf_end;
-	int i, j;
+	int i;
+	unsigned int j;
 
-	fout = fopen("test.decomp.comp", "w");
+	fout = fopen(conf->out, "w");
 	if (!fout)
 	{
 		perror("fopen");
@@ -217,17 +276,17 @@ void encode(unsigned char *buf, size_t size_buf, int treelevels, struct symbolsi
 	fputc(size_buf & 0xFF, fout);		// size
 	fputc((size_buf >> 8) & 0xFF, fout);	// size
 	fputc((size_buf >> 0x10) & 0xFF, fout);	// size
-	fputc(treelevels, fout);
+	fputc(treelevels, fout);		// Huffman tree depths
 	for (i = 1; i <= treelevels; i++)
 	{
-		fputc(symbolsin[i].nb, fout);
+		fputc(symbolsin[i].nb, fout);	// Symbol freq
 	}
 	for (i = 1; i <= treelevels; i++)
 	{
 		for (j = 0; j < symbolsin[i].nb; j++)
-			fputc(symbolsin[i].symbol[j], fout);
+			fputc(symbolsin[i].symbol[j], fout);	// Symbol
 	}
-	buf_end = buf + size_buf;
+	buf_end = buf + size_buf;		// compressed data
 	while (buf < buf_end)
 	{
 		ch = *buf++;
@@ -239,7 +298,7 @@ void encode(unsigned char *buf, size_t size_buf, int treelevels, struct symbolsi
 	fclose(fout);
 }
 
-void huff(unsigned char *buf, size_t size_buf)
+void huff(unsigned char *buf, size_t size_buf, struct conf_c *conf)
 {
 	unsigned int freqs[256];
 	unsigned int i;
@@ -279,10 +338,11 @@ void huff(unsigned char *buf, size_t size_buf)
 	make_symbol(t, 0, symbolsin);
 	dbg_print_symbol(symbolsin, treelevel);
 	t = tree_uniform_build(0, treelevel, symbolsin);
-	dotty(t, "comp.dot");
+	if (conf->dot)
+		dotty(t, conf->dot);
 	make_codes(t, 0, enc, codes);
 	make_symbol(t, 0, ssymbolsin);
-	encode(buf, size_buf, treelevel, ssymbolsin, codes); 
+	encode(buf, size_buf, treelevel, ssymbolsin, codes, conf); 
 }
 
 int main(int argc, char **argv)
@@ -290,14 +350,11 @@ int main(int argc, char **argv)
         int fd;
         struct stat st;
         unsigned char *buf = NULL;
+	struct conf_c conf = {0};
 
-	if (argc != 2)
-	{
-		fprintf(stderr, "%s <file>\n", argv[0]);
-		exit(EXIT_FAILURE);
-	}
-
-        fd = open(argv[1], O_RDONLY);
+	parse_opt(argc, argv, &conf);
+	check_opt(&conf);
+        fd = open(conf.in, O_RDONLY);
         if (fd == -1)
         {
                 perror("open()");
@@ -318,54 +375,9 @@ int main(int argc, char **argv)
                 perror("read()");
                 goto clean;
         }
-	huff(buf, st.st_size);
+	huff(buf, st.st_size, &conf);
 clean:
         free(buf);
         close(fd);
         return 0;
-}
-
-void hex_dump(void *data, int size)
-{
-    unsigned char *p = (unsigned char*)data;
-    unsigned char c;
-    int n;
-    char bytestr[4] = {0};
-    char addrstr[10] = {0};
-    char hexstr[16 * 3 + 5] = {0};
-    char charstr[16 * 1 + 5] = {0};
-
-    for(n = 1; n <= size; n++)
-    {
-        if (n % 16 == 1)
-        {
-                snprintf(addrstr, sizeof(addrstr), "%.4x",
-                    ((unsigned int)p-(unsigned int)data));
-        }
-        c = *p;
-        if (isprint(c) == 0)
-        {
-            c = '.';
-        }
-        snprintf(bytestr, sizeof(bytestr), "%02X ", *p);
-        strncat(hexstr, bytestr, sizeof(hexstr)-strlen(hexstr)-1);
-        snprintf(bytestr, sizeof(bytestr), "%c", c);
-        strncat(charstr, bytestr, sizeof(charstr)-strlen(charstr)-1);
-        if (n % 16 == 0)
-        {
-            printf("[%4.4s]   %-50.50s  %s\n", addrstr, hexstr, charstr);
-            hexstr[0] = 0;
-            charstr[0] = 0;
-        }
-        else if (n % 8 == 0)
-        {
-            strncat(hexstr, "  ", sizeof(hexstr)-strlen(hexstr)-1);
-            strncat(charstr, " ", sizeof(charstr)-strlen(charstr)-1);
-        }
-        p++;
-    }
-    if (strlen(hexstr) > 0)
-    {
-        printf("[%4.4s]   %-50.50s  %s\n", addrstr, hexstr, charstr);
-    }
 }

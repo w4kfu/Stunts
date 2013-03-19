@@ -57,6 +57,7 @@ void heapify(struct s_pqueue *p, int i)
 	int smallest;
 	struct s_tree *t;
 
+
 	l = left(i);
 	r = right(i);
 	if (l < p->heap_size && p->A[l]->freq <= p->A[i]->freq) 
