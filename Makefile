@@ -1,6 +1,6 @@
 RM      = rm -f
 CC 	= gcc
-CFLAGS = -W -Wall -Wextra -ansi -pedantic -ggdb
+CFLAGS = -W -Wall -Wextra -ansi -pedantic
 CFLAGS += -std=c99
 UNSTUNTS_DIR = un_stunts
 UNSTUNTS_SRC	= $(UNSTUNTS_DIR)/unpack.c
