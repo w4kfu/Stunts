@@ -11,7 +11,7 @@ void insert_pq(struct s_pqueue *p, struct s_tree *r)
 
 	p->heap_size++;
 	i = p->heap_size - 1;
-	while ((i > 0) && (p->A[parent(i)]->freq > r->freq)) 
+	while ((i > 0) && (p->A[parent(i)]->freq >= r->freq)) 
 	{
 		p->A[i] = p->A[parent(i)];
 		i = parent(i);

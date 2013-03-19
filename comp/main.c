@@ -63,38 +63,6 @@ void dotty(struct s_tree *tree,char *filename)
         return;
 }
 
-
-/*struct s_tree *build_tree(unsigned char *freqs)
-{
-	int i;
-	struct	s_queue	*q = NULL;
-	struct s_tree *parent = NULL;
-	struct s_tree *left = NULL;
-	struct s_tree *right = NULL;
-
-	for (i = 0; i < 256; i++)
-	{
-		if (freqs[i] != 0)
-			q = push(make_node(i, freqs[i], NULL, NULL), q);
-	}
-	printf("Size %X\n", queue_size(q));
-	//t = top(q);
-	//printf("T = %X\n", t->c);
-	while (queue_size(q) > 1)
-	{
-		right = top(q);
-		printf("RIGHT = %X\n", right->c);
-		q = pop(q);
-		left = top(q);
-		printf("LEFT = %X\n", left->c);
-		q = pop(q);
-		parent = make_node(0, 0, left, right);
-		q = push(parent, q);
-	}
-	dotty(top(q), "comp.dot");
-	return top(q);
-}*/
-
 struct s_tree *build_huffman(unsigned int *freqs) 
 {
 	int i;
@@ -131,6 +99,43 @@ struct s_tree *build_huffman(unsigned int *freqs)
 	return extract_min_pq(&p);
 }
 
+struct s_tree *tree_uniform_build(size_t depth, size_t depthmax, struct symbolsin *symbolsyn)
+{
+	struct s_tree *t = NULL;
+
+  	if (depth <= depthmax)
+    	{
+      		t = malloc(sizeof (struct s_tree));
+		if (!t)
+		{
+			perror("malloc");
+			exit(EXIT_FAILURE);
+		}
+		if (symbolsyn[depth].nb)
+		{
+			t->freq = 1;
+			t->ch = *symbolsyn[depth].symbol++;
+			symbolsyn[depth].nb--;
+		}
+		else
+		{
+			t->freq = 0;
+			t->ch = 0xFFFF;
+		}
+		if (t->freq == 1)
+		{
+			t->left = NULL;
+			t->right = NULL;
+		}
+		else
+		{
+      			t->left = tree_uniform_build(depth + 1, depthmax, symbolsyn);
+      			t->right = tree_uniform_build(depth + 1, depthmax, symbolsyn);
+		}
+    	}
+  	return t;
+}
+
 void dbg_print_symbol(struct symbolsin *symbolsin, unsigned int treelevel)
 {
 	unsigned int i;
@@ -147,23 +152,91 @@ void dbg_print_symbol(struct symbolsin *symbolsin, unsigned int treelevel)
 	}
 }
 
-void make_symbol(struct s_tree *t, unsigned int level, unsigned char *enc, unsigned char **codes, struct symbolsin *symbolsin)
+void make_symbol(struct s_tree *t, unsigned int level, struct symbolsin *symbolsin)
 {
 	if ((t->left == NULL) && (t->right) == NULL)
 	{
-		enc[level] = 0;
-		codes[t->ch] = strdup(enc);
 		symbolsin[level].symbol[symbolsin[level].nb] = t->ch;
 		symbolsin[level].nb++;
 	}
 	else
 	{
-		enc[level] = '0';
-		make_symbol(t->left, level + 1, enc, codes, symbolsin);
-		enc[level] = '1';
-		make_symbol(t->right, level + 1, enc, codes, symbolsin);
+		make_symbol(t->left, level + 1, symbolsin);
+		make_symbol(t->right, level + 1, symbolsin);
 	}
 
+}
+
+void make_codes(struct s_tree *t, int level, unsigned char *enc, unsigned char **codes) 
+{
+	if ((t->left == NULL) && (t->right == NULL)) 
+	{
+		enc[level] = 0;
+		codes[t->ch] = strdup(enc);
+	} 
+	else 
+	{
+		enc[level] = '0';
+		make_codes(t->left, level + 1, enc, codes);
+		enc[level] = '1';
+		make_codes(t->right, level + 1, enc, codes);
+	}
+}
+
+int nbits, current_byte, nbytes;
+
+void bitout(FILE *f, char b) 
+{
+	current_byte <<= 1;
+	if (b == '1') current_byte |= 1;
+	nbits++;
+	if (nbits == 8) 
+	{
+		fputc (current_byte, f);
+		nbytes++;
+		nbits = 0;
+		current_byte = 0;
+	}
+}
+
+void encode(unsigned char *buf, size_t size_buf, int treelevels, struct symbolsin *symbolsin, unsigned char **codes)
+{
+	FILE *fout;
+	unsigned char ch;
+	char *s;
+	unsigned char *buf_end;
+	int i, j;
+
+	fout = fopen("test.decomp.comp", "w");
+	if (!fout)
+	{
+		perror("fopen");
+		return;
+	}
+	fputc(0x02, fout);			// type
+	fputc(size_buf & 0xFF, fout);		// size
+	fputc((size_buf >> 8) & 0xFF, fout);	// size
+	fputc((size_buf >> 0x10) & 0xFF, fout);	// size
+	fputc(treelevels, fout);
+	for (i = 1; i <= treelevels; i++)
+	{
+		fputc(symbolsin[i].nb, fout);
+	}
+	for (i = 1; i <= treelevels; i++)
+	{
+		for (j = 0; j < symbolsin[i].nb; j++)
+			fputc(symbolsin[i].symbol[j], fout);
+	}
+	buf_end = buf + size_buf;
+	while (buf < buf_end)
+	{
+		ch = *buf++;
+		for (s = codes[ch]; *s; s++)
+			bitout(fout, *s);
+	}	
+	while (nbits) 
+		bitout(fout, '0');
+	fclose(fout);
 }
 
 void huff(unsigned char *buf, size_t size_buf)
@@ -173,6 +246,7 @@ void huff(unsigned char *buf, size_t size_buf)
 	unsigned int treelevel;
 	struct s_tree *t = NULL;
 	struct symbolsin *symbolsin;
+	struct symbolsin *ssymbolsin;
 	unsigned char enc[256];
 	unsigned char *codes[256];
 
@@ -180,11 +254,11 @@ void huff(unsigned char *buf, size_t size_buf)
 	for (i = 0; i < size_buf; i++)
 		freqs[buf[i]] += 1;
 	t = build_huffman(freqs);
-	dotty(t, "comp.dot");
 	treelevel = tree_height(t);
 	printf("Tree Height = %d\n", treelevel);
 	printf("Tree Size = %d\n", tree_size(t));
 	symbolsin = malloc(sizeof (struct symbolsin) * (treelevel + 1));
+	ssymbolsin = malloc(sizeof (struct symbolsin) * (treelevel + 1));
 	if (!symbolsin)
 	{
 		perror("malloc()");
@@ -193,15 +267,22 @@ void huff(unsigned char *buf, size_t size_buf)
 	for (i = 0; i <= treelevel; i++)
 	{
 		symbolsin[i].nb = 0;
+		ssymbolsin[i].nb = 0;
 		symbolsin[i].symbol = malloc(sizeof (char) * 256);
+		ssymbolsin[i].symbol = symbolsin[i].symbol;
 		if (!symbolsin[i].symbol)
 		{
 			perror("malloc()");
 			return;
 		}
 	}
-	make_symbol(t, 0, enc, codes, symbolsin);
+	make_symbol(t, 0, symbolsin);
 	dbg_print_symbol(symbolsin, treelevel);
+	t = tree_uniform_build(0, treelevel, symbolsin);
+	dotty(t, "comp.dot");
+	make_codes(t, 0, enc, codes);
+	make_symbol(t, 0, ssymbolsin);
+	encode(buf, size_buf, treelevel, ssymbolsin, codes); 
 }
 
 int main(int argc, char **argv)
