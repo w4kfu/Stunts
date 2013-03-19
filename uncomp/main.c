@@ -107,7 +107,7 @@ void uncomp(unsigned char *buf, struct s_tree *tree, unsigned char *end_buf, uns
 	struct bitmap bits;
 	struct s_tree *dtree = NULL;
 	unsigned int count = 0;
-	char *buf_res = NULL;
+	unsigned char *buf_res = NULL;
 
 	buf_res = malloc(sizeof (char) * uncomp_size);
 	if (!buf)
@@ -202,7 +202,7 @@ struct s_tree *huff_tree(unsigned int treelevel, struct symbolsin *symbolsin)
 }
 
 
-void new_huff(unsigned char *buf, size_t size)
+void huff(unsigned char *buf, size_t size)
 {
 	unsigned int uncomp_size = 0;
 	unsigned int treelevels = 0;
@@ -279,9 +279,7 @@ int main(int argc, char **argv)
                 perror("read()");
                 goto clean;
         }
-	new_huff(buf, st.st_size);
-	//new(buf, st.st_size);
-	//uncomp(buf, st.st_size);
+	huff(buf, st.st_size);
 clean:
         free(buf);
         close(fd);
