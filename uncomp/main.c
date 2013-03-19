@@ -7,70 +7,9 @@
 #include <string.h>
 #include <ctype.h>
 
-#define ROL16(x, y) ((((x)<<(y)) | ((x)>>(16-(y)))) & 0xFFFF)
+#include "tree.h"
 
 void hex_dump(void *data, int size);
-
-unsigned int craftescape(unsigned char *buf, size_t escapelen, unsigned short **escape1, unsigned short **escape2)
-{
-	unsigned char val;
-	size_t i;
-	unsigned int escape;
-	unsigned int alphabet_length = 0x46;
-
-
-	if (!(*escape1 = malloc(sizeof (unsigned short) * escapelen)))
-	{
-		perror("malloc()");
-		exit(EXIT_FAILURE);
-	}
-	memset(*escape1, 0, sizeof (unsigned short) * escapelen);
-	if (!(*escape2 = malloc(sizeof (unsigned short) * escapelen)))
-	{
-		perror("malloc()");
-		exit(EXIT_FAILURE);
-	}
-	memset(*escape2, 0, sizeof (unsigned short) * escapelen);
-	escape = 0;
-	for (i = 0; i < escapelen; i++)
-	{
-		(*escape1)[i] = alphabet_length;
-		escape *= 2;
-		(*escape1)[i] -= escape;
-		val = *buf++;	
-		escape += val;
-		alphabet_length += val;
-		(*escape2)[i] = escape;
-	}
-	return alphabet_length - 0x46;
-}
-
-void craft_symbols_widths(unsigned char *buf, size_t escapelen, unsigned char *alphabet, unsigned char *symbols, unsigned char *widths)
-{
-	unsigned char symbolwidth;
-	unsigned char symbolcount = 0x80;
-	size_t i, j, k, escape;
-
-	if (escapelen >= 8)
-		escapelen = 8;
-
-	escape = 1;
-	for (i = 0, j = 0; escape <= escapelen; escape++, symbolcount >>= 1)
-	{
-		symbolwidth = *buf++;
-		for ( ; symbolwidth > 0; symbolwidth--, j++)
-		{
-			for (k = symbolcount; k; k--, i++)
-			{
-				symbols[i] = alphabet[j];
-				widths[i] = escape;
-			}
-		}
-	}
-	for (; i < 0x100; i++)
-		widths[i] = 0x40;
-
-}
 
 void dump_to_file(char *filename, unsigned char *buf, size_t size)
 {
@@ -86,141 +25,140 @@ void dump_to_file(char *filename, unsigned char *buf, size_t size)
 	close(fd);
 }
 
-int decomp(unsigned char *buf, unsigned char *alphabet, unsigned char *widths, unsigned char *symbols, unsigned short *escape1, unsigned short *escape2, unsigned int uncomp_size, unsigned char *real_end_buf)
+void printdotty(FILE *fp, struct s_tree *tree, int p, struct s_tree *tree_l)
 {
-	unsigned char *dst_buf = NULL;
-	unsigned char *dst_end = NULL;
-	unsigned char *sdst_buf = NULL;
+	static int c = 1;
+	int tc;
 
-       	unsigned char curWidth = 8, nextWidth = 0, code, ind;
-        unsigned short curWord = 0;
-	size_t count = 0x0; // dbg
-
-
-	if (!(dst_buf = malloc(sizeof (char) * uncomp_size)))
-	{
-		perror("malloc()");
-		fprintf(stderr, "Uncomp size = %X\n", uncomp_size);
-		exit(EXIT_FAILURE);
-	}
-	sdst_buf = dst_buf;
-
-	printf("UNCOMP = %X\n", uncomp_size);
-	dst_end = dst_buf + uncomp_size;
-
-	curWord = *(unsigned short*)buf;
-	buf += 2;
-	while (dst_buf < dst_end)
-	{
-		count++;
-		if (count > uncomp_size)
-			break;
-                code = curWord & 0xFF;
-                nextWidth = widths[code];
-                if (nextWidth > 8)
-		{
-                        ind = 0x7;
-			code = curWord >> 8;	
-			curWord = curWord & 0xFF;
-                        while (1) 
-			{
-                                if (!curWidth) 
-				{
-                                        code = *buf++;
-                                        curWidth = 8;
-                                }
-
-                                curWord = (curWord << 1) + ((code & 0x80) == 0x80); 
-				code <<= 1;
-                                curWidth--;
-                                ind += 1;
-
-                                if (curWord < escape2[ind]) 
-				{
-                                        curWord += escape1[ind];
-                                        *dst_buf++ = alphabet[curWord - 0x46];
-					curWord = (curWord & 0xFF) | code << 8;
-					nextWidth = curWidth;
-					curWord = ROL16(curWord, nextWidth);
-					curWidth = 8;
-					curWidth -= nextWidth;
-					code = *buf++;
-					curWidth = 8;
-					break;
-                                }
-                        }
-			nextWidth = 1;
-			//curWord = (curWord & 0xFF) | code << 8;
-                }
-                else 
-		{
-                        *dst_buf++ = symbols[code];
-
-                        if (curWidth < nextWidth) 
-			{
-				curWord = ROL16(curWord, curWidth);
-                                nextWidth -= curWidth;
-
-				curWidth = 8;
-				curWord = (curWord & 0xFF) | *buf++ << 8;
-                        }
-                }
-		curWord = ROL16(curWord, nextWidth);
-		curWidth -= nextWidth;
-	}
-	hex_dump(sdst_buf, uncomp_size);
-	dump_to_file("rez_uncomp", sdst_buf, uncomp_size);
-	return 0;
+	if (p == 0)
+		c = 0;
+	if (tree == NULL)
+		return;
+	tc = ++c;
+	if (tree->key == 0x1B)
+		fprintf(fp, "%d [label=\"%04X\" color=\"green\"];\n", c, tree->key);
+	else if (tree->used == 0)
+		fprintf(fp, "%d [label=\"%04X\" color=\"red\"];\n", c, tree->key);
+	else
+		fprintf(fp, "%d [label=\"%04X\" color=\"blue\"];\n", c, tree->key);
+        if (p != 0)
+        {
+            fprintf(fp, "%d->%d", p, tc);
+            if (tree == tree_l)
+                fprintf(fp," [label=\"0\"];\n");
+            else
+                fprintf(fp," [label=\"1\"];\n");
+        }
+        printdotty(fp, tree->left, tc, tree->left);
+        printdotty(fp, tree->right, tc, tree->left);
+    	return;
 }
 
-void uncomp(unsigned char *buf, size_t size)
+void dotty(struct s_tree *tree,char *filename)    
+{
+	FILE *fp;
+	
+	fp = fopen(filename, "wb");
+	if(fp == NULL)
+	{
+		perror("fopen()");
+		return;
+	}
+    	fprintf(fp,"digraph huff_tree{\n");
+    	printdotty(fp, tree, 0, tree->left);
+    	fprintf(fp,"}\n");
+	fclose(fp);
+	return;
+}
+
+int count = 0;
+unsigned char *gcode;
+struct symbolsin
+{
+	unsigned int nb;
+	unsigned char *symbol;
+};
+
+struct s_tree *tree_uniform_build(size_t depth, size_t depthmax, struct symbolsin *symbolsyn)
+{
+	struct s_tree *t = NULL;
+  	if (depth <= depthmax)
+    	{
+      		t = malloc(sizeof (struct s_tree));
+		if (symbolsyn[depth].nb)
+		{
+			t->used = 1;
+			t->key = *symbolsyn[depth].symbol++;
+			symbolsyn[depth].nb--;
+			count++;
+		}
+		else
+		{
+			t->used = 0;
+			t->key = 256;
+		}
+		if (t->used == 1)
+		{
+			t->left = NULL;
+			t->right = NULL;
+		}
+		else
+		{
+      			t->left = tree_uniform_build(depth + 1, depthmax, symbolsyn);
+      			t->right = tree_uniform_build(depth + 1, depthmax, symbolsyn);
+		}
+    	}
+  	return t;
+}
+
+void huff_tree(unsigned int treelevel, struct symbolsin *symbolsin)
+{
+	struct s_tree *tree = NULL;
+
+	tree = make_tree(256, NULL, NULL);
+	tree = tree_uniform_build(0, treelevel, symbolsin);
+	//depth_print(tree);
+	printf("height = %d\n", height(tree));
+	printf("size = %d\n", size(tree));
+	printf("count = %X\n", count);
+	dotty(tree, "test.dot");
+}
+
+
+void new_huff(unsigned char *buf, size_t size)
 {
 	unsigned int uncomp_size = 0;
-	unsigned char type;
-	unsigned char escapelen;
-	unsigned int alphabet_length;
-	unsigned short *escape1 = NULL;
-	unsigned short *escape2 = NULL;
-	unsigned char widths[0x100] = {0};
-	unsigned char symbols[0x100] = {0};
-	unsigned char *alphabet = NULL;
-	unsigned char *buf_escape = NULL;
-	unsigned char	*buf_end = NULL;
+	unsigned int treelevels = 0;
+	unsigned int symbol_size = 0;
+	struct symbolsin *symbolsin;
+	unsigned char *alph = NULL;
+	unsigned int i, j;
 
-	buf_end = buf + size;
-	printf("RealSize   = 0x%08X\n", size);
-	type = *buf++;
-	printf("Type = %02X\n", type);
+	printf("CompressedSize = %X\n", size);
+	buf++;
 	uncomp_size = (*buf) | (*(buf + 1) << 0x8) | (*(buf + 2) << 0x10);
 	buf += 3;
-	printf("uncomp_size = %02X\n", uncomp_size);
-	escapelen = *buf++;
-	buf_escape = buf;
-	printf("EscapeLen = %02X\n", escapelen);
-	alphabet_length = craftescape(buf, escapelen, &escape1, &escape2);
-	buf += escapelen;
-	printf("AlphabetLength = %X\n", alphabet_length);
-	printf("escape1 :\n");
-	hex_dump(escape1, escapelen * 2);
-	printf("escape2 :\n");
-	hex_dump(escape2, escapelen * 2);
-	if (!(alphabet = malloc(sizeof (char) * alphabet_length)))
+	printf("Uncomp_size = %X\n", uncomp_size);
+	treelevels = *buf++;
+	printf("TreeLevels = %X\n", treelevels);
+	symbolsin = malloc(sizeof (struct symbolsin) * (treelevels + 1));
+	if (!symbolsin)
 	{
 		perror("malloc()");
-		exit(EXIT_FAILURE);
+		return;
 	}
-	memcpy(alphabet, buf, alphabet_length);
-	buf += alphabet_length;
-	printf("alphabet :\n");
-	hex_dump(alphabet, alphabet_length);
-	craft_symbols_widths(buf_escape, escapelen, alphabet, symbols, widths);
-	printf("symbols :\n");
-	hex_dump(symbols, 0x100);
-	printf("widths :\n");
-	hex_dump(widths, 0x100);
-
-	decomp(buf, alphabet, widths, symbols, escape1, escape2, uncomp_size, buf_end);
-
+	symbolsin[0].nb = 0;
+	alph = buf + treelevels;
+        for (i = 1; i <= treelevels; i++)
+        {
+                symbolsin[i].nb = *buf++;
+		symbolsin[i].symbol = malloc(sizeof (char) * symbolsin[i].nb);
+		for (j = 0; j < symbolsin[i].nb; j++)
+		{
+			symbolsin[i].symbol[j] = *alph++;
+		}	
+        }
+	huff_tree(treelevels, symbolsin);
 }
 
 int main(int argc, char **argv)
@@ -256,7 +194,9 @@ int main(int argc, char **argv)
                 perror("read()");
                 goto clean;
         }
-	uncomp(buf, st.st_size);
+	new_huff(buf, st.st_size);
+	//new(buf, st.st_size);
+	//uncomp(buf, st.st_size);
 clean:
         free(buf);
         close(fd);
@@ -281,7 +221,7 @@ void hex_dump(void *data, int size)
                     ((unsigned int)p-(unsigned int)data));
         }
         c = *p;
-        if (isalnum(c) == 0)
+        if (isprint(c) == 0)
         {
             c = '.';
         }
