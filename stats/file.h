@@ -14,7 +14,7 @@ struct file
 {
 	char filename[4096];
 	int hFile;
-	char *bMap;
+	unsigned char *bMap;
 	struct stat sb;
 };
 
