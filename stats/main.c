@@ -105,7 +105,7 @@ void parse_type2(FILE *fout, struct file *sFile)
 	unsigned char **name_entry = NULL;
 	unsigned char *buf = NULL;
 
-	buf = sFile->bMap;
+	buf = (unsigned char*)sFile->bMap;
 	buf += 4;
 	nb_entry = *(unsigned short*)(buf);
 	buf += 2;

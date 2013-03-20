@@ -10,7 +10,7 @@
 #include <sys/mman.h>
 #include <string.h>
 
-struct file
+struct s_file
 {
 	char filename[4096];
 	int hFile;
@@ -18,9 +18,9 @@ struct file
 	struct stat sb;
 };
 
-int open_file(char *lpFileName, struct file *sFile);
-int mapview_file(struct file *sFile);
-int open_and_map(char *lpFileName, struct file *sFile);
-void clean_file(struct file *sFile);
+int open_file(char *lpFileName, struct s_file *sFile);
+int mapview_file(struct s_file *sFile);
+int open_and_map(char *lpFileName, struct s_file *sFile);
+void clean_file(struct s_file *sFile);
 
 #endif // __FILE_H__
