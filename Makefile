@@ -1,7 +1,8 @@
 CC 		= gcc
-CFLAGS 		= -W -Wall -Wextra -ansi -pedantic -ggdb
-CFLAGS 		+= -std=c99
 RM      	= rm -f
+DOT		= dot
+
+CFLAGS 		= -W -Wall -Wextra -ansi -pedantic -D_BSD_SOURCE -std=c99
 
 # Unpacker
 UNSTUNTS_DIR 	= unstunts
@@ -64,4 +65,4 @@ genstats: $(STATS_NAME)
 distclean:  clean
 	$(RM) -r $(BIN_DIR)
 
-.PHONY:  clean all distclean
+.PHONY:  clean all distclean debug

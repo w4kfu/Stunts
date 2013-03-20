@@ -4,6 +4,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <ctype.h>
 #include "file.h"
 
 struct dos_header
@@ -118,7 +119,7 @@ void parse_type2(FILE *fout, struct file *sFile)
 		if (!name_entry[i])
 			break;
 		memset(name_entry[i], 0, 5);
-		strncpy(name_entry[i], buf, 4);
+		memcpy(name_entry[i], buf, 4);
 		buf += 4;
 		fprintf(fout, "* 0x%02X (%d) : %s\n", (i + 1), i + 1, name_entry[i]);
 	}

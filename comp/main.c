@@ -236,7 +236,7 @@ void make_codes(struct s_tree *t, int level, unsigned char *enc, unsigned char *
 	if ((t->left == NULL) && (t->right == NULL)) 
 	{
 		enc[level] = 0;
-		codes[t->ch] = strdup(enc);
+		codes[t->ch] = (unsigned char*)strdup((char*)enc);
 	} 
 	else 
 	{
