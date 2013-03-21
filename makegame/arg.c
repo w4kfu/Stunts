@@ -95,9 +95,9 @@ void check_opt(struct s_conf *conf, char *name)
                 exit(EXIT_FAILURE);
 	}
 	conf->dh = (struct dos_header*)conf->fhdr.bMap;
-	conf->ccmn = (struct s_comp*)conf->fcmn.bMap;
-	conf->cdif = (struct s_comp*)conf->fdif.bMap;
-	conf->ccod = (struct s_comp*)conf->fcod.bMap;
+	memcpy(&conf->ccmn, conf->fcmn.bMap, 0x4);
+	memcpy(&conf->cdif, conf->fdif.bMap, 0x4);
+	memcpy(&conf->ccod, conf->fcod.bMap, 0x4);
 }
 
 void clean(struct s_conf *conf)

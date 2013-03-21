@@ -22,11 +22,20 @@ struct bitmap
         unsigned char count;
 };
 
+struct s_comp
+{
+        unsigned char type;
+        unsigned int size:24;
+	unsigned char *buf_data;
+	struct s_tree *tree;
+	unsigned char *buf_out;
+};
+
 int getbit(struct bitmap *p);
-void uncomp(unsigned char *buf, struct s_tree *tree, unsigned char *end_buf, unsigned int uncomp_size, char *outfile);
+void uncomp(struct s_comp *comp, unsigned char *end_buf);
 struct s_tree *tree_uniform_build(size_t depth, size_t depthmax, struct symbolsin *symbolsyn);
 struct s_tree *huff_tree(unsigned int treelevel, struct symbolsin *symbolsin);
-struct s_tree *huff(unsigned char *buf, size_t size, char *outfile);
+void huff(unsigned char *buf, size_t size, struct s_comp *comp);
 
 
 #endif

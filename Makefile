@@ -37,7 +37,9 @@ STATS_OBJ	= $(STATS_SRC:.c=.o)
 MAKEGAME_DIR	= makegame
 MAKEGAME_SRC	=	$(MAKEGAME_DIR)/main.c	\
 			$(MAKEGAME_DIR)/file.c	\
-			$(MAKEGAME_DIR)/arg.c
+			$(MAKEGAME_DIR)/arg.c	\
+ 			$(UNCOMP_DIR)/uncomp.c 	\
+			$(UNCOMP_DIR)/tree.c
 
 MAKEGAME_NAME	= makegame
 MAKEGAME_OBJ	= $(MAKEGAME_SRC:.c=.o)
@@ -60,7 +62,6 @@ $(STATS_NAME): $(BIN_DIR) $(STATS_OBJ)
 
 $(MAKEGAME_NAME): $(BIN_DIR) $(MAKEGAME_OBJ)
 	$(CC) $(CFLAGS) -o $(BIN_DIR)/$(MAKEGAME_NAME) $(MAKEGAME_OBJ)
-
 
 $(BIN_DIR):
 	mkdir bin

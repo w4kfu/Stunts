@@ -3,6 +3,7 @@
 
 #include <getopt.h>
 #include "file.h"
+#include "../uncomp/uncomp.h"
 
 struct dos_header
 {
@@ -22,12 +23,6 @@ struct dos_header
         unsigned short e_ovno;
 };
 
-struct s_comp
-{
-	unsigned char type;
-	unsigned int size:24;
-};
-
 struct s_conf
 {
         char *hdr;
@@ -35,13 +30,13 @@ struct s_conf
 	struct dos_header *dh;
         char *cmn;
 	struct s_file fcmn;
-	struct s_comp *ccmn;
+	struct s_comp ccmn;
         char *dif;
 	struct s_file fdif;
-	struct s_comp *cdif;
+	struct s_comp cdif;
 	char *cod;
 	struct s_file fcod;
-	struct s_comp *ccod;
+	struct s_comp ccod;
 };
 
 

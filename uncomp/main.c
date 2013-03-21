@@ -78,6 +78,20 @@ void check_opt(struct conf_c *conf, char *name)
 	}
 }
 
+void dump_to_file(char *filename, unsigned char *buf, size_t size)
+{
+	int fd;
+
+        fd = open(filename, O_WRONLY | O_CREAT, 0644);
+        if (fd == -1)
+        {
+                perror("open()");
+                exit(0);
+        }
+	write(fd, buf, size);
+	close(fd);
+}
+
 void printdotty(FILE *fp, struct s_tree *tree, int p, struct s_tree *tree_l)
 {
 	static int c = 1;
@@ -131,7 +145,7 @@ int main(int argc, char **argv)
         struct stat st;
         unsigned char *buf = NULL;
 	struct conf_c conf = {0};
-	struct s_tree *tree = NULL;
+	struct s_comp comp = {0};
 
 	parse_opt(argc, argv, &conf);
 	check_opt(&conf, argv[0]);
@@ -156,11 +170,14 @@ int main(int argc, char **argv)
                 perror("read()");
                 goto clean;
         }
-	tree = huff(buf, st.st_size, conf.out);
-	if (tree)
+	huff(buf, st.st_size, &comp);
+	if (comp.tree)
 	{
 		if (conf.dot)
-			dotty(tree, conf.dot);
+			dotty(comp.tree, conf.dot);
+		uncomp(&comp, buf + st.st_size);
+		if (comp.buf_out)
+			dump_to_file(conf.out, comp.buf_out, comp.size);
 	}
 clean:
         free(buf);

@@ -1,19 +1,5 @@
 #include "uncomp.h"
 
-void dump_to_file(char *filename, unsigned char *buf, size_t size)
-{
-	int fd;
-
-        fd = open(filename, O_WRONLY | O_CREAT, 0644);
-        if (fd == -1)
-        {
-                perror("open()");
-                exit(0);
-        }
-	write(fd, buf, size);
-	close(fd);
-}
-
 int getbit(struct bitmap *p) 
 {
     int b;
@@ -29,24 +15,25 @@ int getbit(struct bitmap *p)
     return b;
 }
 
-void uncomp(unsigned char *buf, struct s_tree *tree, unsigned char *end_buf, unsigned int uncomp_size, char *outfile)
+void uncomp(struct s_comp *comp, unsigned char *end_buf)
 {
 	struct bitmap bits;
 	struct s_tree *dtree = NULL;
 	unsigned int count = 0;
 	unsigned char *buf_res = NULL;
 
-	buf_res = malloc(sizeof (char) * uncomp_size);
-	if (!buf)
+	buf_res = malloc(sizeof (char) * comp->size);
+	if (!buf_res)
 	{
 		perror("malloc()");
+		comp->buf_out = NULL;
 		return;
 	}
 	bits.count = 0x8;
-	bits.pbuf = buf;
+	bits.pbuf = comp->buf_data;
 	bits.buf = *bits.pbuf++;
-	dtree = tree;
-	while (count < uncomp_size)
+	dtree = comp->tree;
+	while (count < comp->size)
 	{
 		while (dtree->key == 256)
 		{
@@ -67,15 +54,16 @@ void uncomp(unsigned char *buf, struct s_tree *tree, unsigned char *end_buf, uns
 		}
 		buf_res[count] = dtree->key;
 		count++;
-		if (buf > end_buf)
+		if (bits.pbuf > end_buf)
 			break;
-		dtree = tree;
+		dtree = comp->tree;
 	}
-	if (count != uncomp_size)
+	if (count != comp->size)
 	{
 		fprintf(stderr, "Data left !\n");
+		exit(EXIT_FAILURE);
 	}
-	dump_to_file(outfile, buf_res, count);
+	comp->buf_out = buf_res;
 }
 
 struct s_tree *tree_uniform_build(size_t depth, size_t depthmax, struct symbolsin *symbolsyn)
@@ -127,7 +115,7 @@ struct s_tree *huff_tree(unsigned int treelevel, struct symbolsin *symbolsin)
 }
 
 
-struct s_tree *huff(unsigned char *buf, size_t size, char *outfile)
+void huff(unsigned char *buf, size_t size, struct s_comp *comp)
 {
 	unsigned int uncomp_size = 0;
 	unsigned int treelevels = 0;
@@ -135,14 +123,14 @@ struct s_tree *huff(unsigned char *buf, size_t size, char *outfile)
 	unsigned char *alph = NULL;
 	unsigned int i, j;
 	struct s_tree *tree = NULL;
-	unsigned char *buf_end = NULL;
+	//unsigned char *buf_end = NULL;
 
-	buf_end = buf + size;
+	//buf_end = buf + size;
 	printf("CompressedSize = %X\n", size);
 	if (*buf++ != 0x02)
 	{
 		fprintf(stderr, "Wrong type of file\n");
-		return NULL;
+		return;
 	}
 	uncomp_size = (*buf) | (*(buf + 1) << 0x8) | (*(buf + 2) << 0x10);
 	buf += 3;
@@ -152,13 +140,13 @@ struct s_tree *huff(unsigned char *buf, size_t size, char *outfile)
 	if (treelevels > HTREE_MAXLEVEL)
 	{
 		fprintf(stderr, "Huffman tree has insane levels\n");
-		return NULL;
+		return;
 	}
 	symbolsin = malloc(sizeof (struct symbolsin) * (treelevels + 1));
 	if (!symbolsin)
 	{
 		perror("malloc()");
-		return NULL;
+		return;
 	}
 	symbolsin[0].nb = 0;
 	alph = buf + treelevels;
@@ -172,6 +160,11 @@ struct s_tree *huff(unsigned char *buf, size_t size, char *outfile)
 		}	
         }
 	tree = huff_tree(treelevels, symbolsin);
-	uncomp(alph, tree, buf_end, uncomp_size, outfile);
-	return tree;
+	comp->size = uncomp_size;
+	comp->buf_data = alph;
+	comp->tree = tree;
+	/*if (buf_data)
+		*buf_data = alph;*/
+	//uncomp(alph, tree, buf_end, uncomp_size, outfile);
+	return;
 }
