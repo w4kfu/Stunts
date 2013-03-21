@@ -50,6 +50,46 @@ int checkfiles(struct s_conf *conf)
 	return 1;
 }
 
+void compute_offset(unsigned short *a, unsigned short *b, unsigned long c)
+{
+	unsigned short d;
+
+	c += *a;
+	d = c / 0x10;
+	*b += d;
+	*a = c - (d << 4);
+}
+
+/* This part start at loc_10BC0 in file sub_10B1A.asm */
+void apply_diff(struct s_comp *cmn, struct s_comp *dif)
+{
+	unsigned short actual_val;
+	unsigned short offset = 0;
+	unsigned short segment = 0;
+	unsigned char *buf;
+	unsigned int pos = 0;
+
+	segment -= 0x1000;
+	offset--;
+	compute_offset(&offset, &segment, 0);
+	buf = dif->buf_out;
+	while (buf < (dif->buf_out + dif->size))
+	{
+		actual_val = *(unsigned short*)buf;
+		buf += 2;
+		compute_offset(&offset, &segment, actual_val & 0x7FFF);
+		pos = segment << 4 | offset;
+		*(cmn->buf_out + pos) = *buf++;
+		*(cmn->buf_out + pos + 1) = *buf++;
+		if ((actual_val & 0x8000) != 0)
+		{
+			*(cmn->buf_out + pos + 2) = *buf++;
+			*(cmn->buf_out + pos + 3) = *buf++;	
+		}
+	}
+}
+
+/* all the following code can be found inside sub_10B1A.asm */
 void info_new_exec(struct s_conf *conf)
 {
 	unsigned int exec_size = 0;
@@ -84,19 +124,16 @@ void info_new_exec(struct s_conf *conf)
 	if (conf->ccmn.tree)
         {
 		uncomp(&conf->ccmn, (unsigned char*)(conf->fcmn.bMap + conf->fcmn.sb.st_size));
-		if (conf->ccmn.buf_out)
-		{
-			write(fd_out, conf->ccmn.buf_out, conf->ccmn.size);	
-			free(conf->ccmn.buf_out);
-		}
-		else
+		if (!conf->ccmn.buf_out)
 		{
 			fprintf(stderr, "[-] Error decompression !\n");
+			return;
 		}
         }
 	else
 	{
 		fprintf(stderr, "[-] No Huffman tree !\n");
+		return;
 	}
 
 	/* work with *.DIF */
@@ -104,20 +141,23 @@ void info_new_exec(struct s_conf *conf)
 	if (conf->cdif.tree)
         {
 		uncomp(&conf->cdif, (unsigned char*)(conf->fdif.bMap + conf->fdif.sb.st_size));
-		if (conf->cdif.buf_out)
-		{
-			//write(fd_out, conf->ccmn.buf_out, conf->ccmn.size);	
-			free(conf->cdif.buf_out);
-		}
-		else
+		if (!conf->cdif.buf_out)
 		{
 			fprintf(stderr, "[-] Error decompression !\n");
+			return;
 		}
 	}
 	else
 	{
 		fprintf(stderr, "[-] No Huffman tree !\n");
+		return;
 	}
+
+	/* Now we have *.CMN and *.DIF uncompressed, we can apply the diff on the cmn data */
+	apply_diff(&conf->ccmn, &conf->cdif);
+	write(fd_out, conf->ccmn.buf_out, conf->ccmn.size);
+	free(conf->ccmn.buf_out);
+	free(conf->cdif.buf_out);
 
 	/* work with *.COD */
 	huff((unsigned char*)conf->fcod.bMap, conf->fcod.sb.st_size, &conf->ccod);
@@ -126,16 +166,19 @@ void info_new_exec(struct s_conf *conf)
 		uncomp(&conf->ccod, (unsigned char*)(conf->fcod.bMap + conf->fcod.sb.st_size));
 		if (conf->ccod.buf_out)
 		{
+			write(fd_out, conf->ccod.buf_out, conf->ccod.size);	
 			free(conf->ccod.buf_out);
 		}
 		else
 		{
 			fprintf(stderr, "[-] Error decompression !\n");
+			return;
 		}
 	}
 	else
 	{
 		fprintf(stderr, "[-] No Huffman tree !\n");
+		return;
 	}
 	close(fd_out);
 }

@@ -1,3 +1,7 @@
+; =============== S U B	R O U T	I N E =======================================
+
+; Attributes: bp-based frame
+
 ; int __cdecl __far sub_10B1A(int type_graphic)
 sub_10B1A	proc far		; CODE XREF: _main+5E9p
 
@@ -110,7 +114,7 @@ loc_10BD6:				; CODE XREF: sub_10B1A+B5j
 		push	[bp+Offset]
 		push	[bp+Segment]
 		push	cs
-		call	near ptr floatDiv
+		call	near ptr ComputeOffset
 		add	sp, 8
 		mov	[bp+Segment], ax
 		mov	[bp+Offset], dx
@@ -140,7 +144,7 @@ loc_10C0F:				; CODE XREF: sub_10B1A+F0j
 		push	[bp+Offset]
 		push	[bp+Segment]
 		push	cs
-		call	near ptr floatDiv
+		call	near ptr ComputeOffset
 		add	sp, 8
 		mov	[bp+Segment], ax
 		mov	[bp+Offset], dx
@@ -179,7 +183,7 @@ loc_10C72:				; CODE XREF: sub_10B1A+1D2j
 		push	[bp+Offset]
 		push	[bp+Segment]
 		push	cs
-		call	near ptr floatDiv
+		call	near ptr ComputeOffset
 		add	sp, 8
 		mov	[bp+Segment], ax
 		mov	[bp+Offset], dx
