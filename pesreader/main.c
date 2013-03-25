@@ -180,7 +180,7 @@ void expandpes(unsigned char *buf, struct s_pes *p, unsigned int nb_entry)
 				break;
 		}
 	}
-	hex_dump(res_out, new_size);
+	//hex_dump(res_out, new_size);
 	dump_to_file("real.pes", res_out, new_size);
 	read_pes(res_out);
 }
@@ -213,6 +213,7 @@ void unflip(unsigned char *buf, unsigned int size)
 	/* fill name and offset of each entry */
 	for (i = 0; i < nb_entry; i++)
 	{
+		memset(p[i].name, 0, 5);
 		memcpy(p[i].name, buf + (i * 4), 4);
 		memcpy(&p[i].offset, (char*)(buf + (i * 4) + (nb_entry * 4)), 4);
 	}
@@ -226,6 +227,8 @@ void unflip(unsigned char *buf, unsigned int size)
 			val = *(abuf + 0xE) >> 4;
 			if ((val & 0x0F))
 			{	
+				printf("Flipping file %s\n", p[i].name);
+				val &= 0x0F;
 				himg = (struct s_headerimg*)abuf;
 				abuf += 0x10;
 				if (!(pout = malloc(sizeof (char) * himg->width * himg->height)))
@@ -235,7 +238,7 @@ void unflip(unsigned char *buf, unsigned int size)
 				}
 				for (j = 0; j < 4; j++)
 				{
-					if ((val & 0x1))
+					if ((val & 0x01))
 					{
 						for (y = 0; y < himg->height; y++)
 						{
@@ -247,8 +250,8 @@ void unflip(unsigned char *buf, unsigned int size)
 						pout = pout - (himg->width * himg->height);
 						/* update bit flipped */
 						memcpy(abuf, pout, (himg->width * himg->height));
-						abuf = abuf + (himg->width * himg->height);	
 					}
+					abuf = abuf + (himg->width * himg->height);	
 					val >>= 1;
 				}
 				free(pout);
@@ -293,14 +296,15 @@ void read_pes(unsigned char *buf)
 	}
 	for (i = 0; i < nb_entry; i++)
 	{
+		memset(p[i].name, 0, 5);
 		memcpy(p[i].name, buf + (i * 4), 4);
 		memcpy(&p[i].offset, (char*)(buf + (i * 4) + (nb_entry * 4)), 4);
 	}
 	buf += (nb_entry * 8);
 	for (i = 0; i < nb_entry; i++)
 	{
-		printf("Entry : %d, Name : %s, Offset %08X, Size : %08X\n", i, p[i].name, p[i].offset, p[i + 1].offset - p[i].offset);
-		hex_dump(buf + p[i].offset, p[i + 1].offset - p[i].offset);
+		//printf("Entry : %d, Name : %s, Offset %08X, Size : %08X\n", i, p[i].name, p[i].offset, p[i + 1].offset - p[i].offset);
+		//hex_dump(buf + p[i].offset, p[i + 1].offset - p[i].offset);
 		readtobmp(buf + p[i].offset, p[i].name);
 	}
 }
@@ -394,7 +398,7 @@ void hex_dump(void *data, int size)
                 fprintf(stderr, "[-] No Huffman tree !\n");
                 return;
         }
-	hex_dump(chuff.buf_out, chuff.size);
+	//hex_dump(chuff.buf_out, chuff.size);
 	rle(chuff.buf_out, chuff.size);
 }*/
 
