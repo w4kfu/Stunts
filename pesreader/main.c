@@ -46,6 +46,8 @@ int checkpacktype(struct s_conf *conf)
 	return 1;
 }
 
+/* seg037:000A ; int __cdecl __far ComputeRealSize(int OffsetData, int SegData) */
+
 unsigned int computenewsize(unsigned char *buf, struct s_pes *p, unsigned int nb_entry)
 {
 	unsigned int i;
@@ -81,6 +83,8 @@ void dump_to_file(char *filename, unsigned char *buf, size_t size)
 	write(fd, buf, size);
 	close(fd);
 }
+
+/* seg012:7582 ; int __cdecl __far sub_35FA2(int OffsetUncompData, int SegUncompData, int OffsetResData, int SegResData) */
 
 void expandpes(unsigned char *buf, struct s_pes *p, unsigned int nb_entry)
 {
@@ -180,6 +184,8 @@ void expandpes(unsigned char *buf, struct s_pes *p, unsigned int nb_entry)
 	dump_to_file("real.pes", res_out, new_size);
 	read_pes(res_out);
 }
+
+/* seg012:76D6 ; int __cdecl __far sub_360F6(int OffsetUncompData, int SegUncompData, int OffsetResData, int SegResData) */
 
 void unflip(unsigned char *buf, unsigned int size)
 {
