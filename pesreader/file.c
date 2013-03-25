@@ -19,7 +19,7 @@ int open_file(char *lpFileName, struct s_file *sFile)
 
 int mapview_file(struct s_file *sFile)
 {
-	if ((sFile->bMap = mmap (NULL, sFile->sb.st_size, PROT_READ, MAP_PRIVATE,
+	if ((sFile->bMap = mmap (NULL, sFile->sb.st_size, PROT_READ | PROT_WRITE, MAP_PRIVATE,
 				sFile->hFile, 0)) == MAP_FAILED)
 	{
 		perror("mmap()");

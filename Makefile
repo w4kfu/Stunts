@@ -51,7 +51,8 @@ PESREADER_SRC	=	$(PESREADER_DIR)/main.c	\
 			$(PESREADER_DIR)/arg.c	\
 			$(PESREADER_DIR)/file.c \
  			$(UNCOMP_DIR)/uncomp.c 	\
-			$(UNCOMP_DIR)/tree.c
+			$(UNCOMP_DIR)/tree.c	\
+			$(PESREADER_DIR)/bmp.c
 PESREADER_NAME	= pesreader
 PESREADER_OBJ	= $(PESREADER_SRC:.c=.o)
 

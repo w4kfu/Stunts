@@ -168,3 +168,173 @@ void huff(unsigned char *buf, size_t size, struct s_comp *comp)
 	//uncomp(alph, tree, buf_end, uncomp_size, outfile);
 	return;
 }
+
+void firstpasses(unsigned char *buf, unsigned char *dbuf, unsigned short *head, unsigned int uncomp_size)
+{
+	unsigned short block_size = 0;
+	unsigned short size = 0;
+	unsigned char escape = 0;
+	unsigned char actual = 0;
+	unsigned char *buf_seq = NULL;
+	unsigned char nb_seq = 0;
+	int i;
+
+	(void)uncomp_size;
+	block_size = head[0];
+	size = head[1];
+	escape = head[3] & 0xFF;
+	printf("Block_size = %X\n", block_size);
+	printf("Size = %X\n", size);
+	printf("Escape = %X\n", escape);
+	while (1)
+	{
+		actual = *buf++;
+		if (actual != escape)
+		{
+			*dbuf++ = actual;
+			block_size--;
+			if (!block_size)
+			{
+				if (!size)
+					break;
+				size--;
+			}
+		}
+		else
+		{
+			buf_seq = buf;
+			while ((actual = *buf++) != escape)
+			{
+				*dbuf++ = actual;
+				block_size--;
+				if (!block_size)
+				{
+					if (!size)
+					{
+						printf("BREAK WTF !?");
+						break;
+					}
+					size--;
+				}
+			}
+			nb_seq = *buf++ - 1;
+			while(nb_seq--)
+			{
+				for (i = 0; i < (buf - buf_seq - 2); i++)
+					*dbuf++ = *(buf_seq + i);
+			}
+			if (!block_size && !size)
+				break;
+		}
+	}
+}
+
+void secondpasses(unsigned char *buf, unsigned char *res, unsigned short *head, unsigned int uncomp_size)
+{
+	unsigned char tab[0x100];
+	unsigned char *t = NULL;
+	unsigned int i;
+	unsigned int count = 0;
+	unsigned char actual = 0;
+	unsigned char nb_rep = 0;
+	unsigned char *sres = NULL;
+
+	memset(tab, 0, 0x100);
+	printf("LEN = %X\n", head[2]);
+	t = (unsigned char*)head + 5;
+	printf("START = %X\n", *t);
+	for (i = 0; i < (head[2] & 0x7F); i++)
+	{
+		tab[t[i]] = i + 1;
+	}
+	//hex_dump(tab, 0x100);
+	sres = res;
+	while (count < uncomp_size)
+	{
+		actual = *buf++;
+		if (tab[actual])
+		{
+			if (tab[actual] == 0x01)
+			{
+				nb_rep = *buf++;
+				actual = *buf++;
+			}
+			else if (tab[actual] == 0x03)
+			{
+				nb_rep = *buf++;	
+				nb_rep |= *buf++ << 8;
+				actual = *buf++;
+			}
+			else
+			{
+				nb_rep = tab[actual] - 1;
+				actual = *buf++;
+			}
+			count += nb_rep;
+			while (nb_rep--)
+			{
+				*res++ = actual;
+			}
+		}
+		else
+		{
+			*res++ = actual;
+			count += 1;
+		}
+	}
+	printf("COunt = %X\n", count);
+	(void)sres;
+	//hex_dump(sres, count);
+}
+
+void rle(unsigned char *rbuf, unsigned int buf_size)
+{
+	unsigned int uncomp_size;
+	unsigned short head[0x8];
+	unsigned char *buf = NULL;
+	unsigned char *tmp = NULL;
+	unsigned char *res = NULL;
+
+	(void)buf_size;
+	buf = rbuf;
+	if (*buf++ != 0x01)
+	{
+		fprintf(stderr, "[-] Wrong type !\n");
+	}
+	uncomp_size = (*buf) | (*(buf + 1) << 0x8) | (*(buf + 2) << 0x10);
+	buf += 3;
+	printf("Uncomp_size = %X\n", uncomp_size);
+	memcpy(head, buf, 0x8 * 2);	
+	buf = rbuf + 9;
+	printf("OFF = %X\n", head[2]);
+	printf("OFF = %X\n", head[2] & 0x7F);
+	buf = buf + (head[2] & 0x7F);
+	printf("DIFF = %02X\n", buf - rbuf);
+	if ((head[2] & 0xFF) <= 0x80)
+	{
+		if (head[2] != 1)
+		{
+			/*unsigned short bx, ax = 0;
+			bx = head[0];
+			ax = head[1];
+			printf("BX = %X\n", bx);
+			printf("AX = %X (LOOK LIKE SIZE)\n", ax);*/
+			tmp = malloc(sizeof (char) * uncomp_size);
+			if (!tmp)
+			{
+				fprintf(stderr, "malloc()");
+				return;
+			}
+			firstpasses(buf, tmp, head, uncomp_size);
+			buf = tmp;
+		}
+	}
+	if (!(res = malloc(sizeof (char) * uncomp_size)))
+	{
+		perror("malloc()");
+		return;
+	}
+	secondpasses(buf, res, head, uncomp_size);
+	//hex_dump(tmp, uncomp_size);
+}
+
